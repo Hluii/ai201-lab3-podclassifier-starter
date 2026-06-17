@@ -55,7 +55,48 @@ def build_few_shot_prompt(labeled_examples: list[dict], description: str) -> str
 
     Before writing code, complete specs/classifier-spec.md.
     """
-    return ""
+    instructions = (
+        "You are classifying podcast episodes by their format. Classify the "
+        "episode into exactly one of these four labels:\n\n"
+        "- interview: a conversation between a host and one or more guests\n"
+        "- solo: a single host speaking from memory, experience, or opinion — "
+        "no guests, no assembled external sources\n"
+        "- panel: multiple guests with roughly equal speaking time, often "
+        "debating or discussing a topic together\n"
+        "- narrative: a story assembled from external sources — interviews, "
+        "archival audio, reporting — with a clear narrative arc\n\n"
+        "Return only the label and your reasoning. Do not explain the taxonomy."
+    )
+
+    if labeled_examples:
+        example_blocks = "\n\n---\n\n".join(
+            f"Title: {ex.get('title', '')}\n"
+            f"Description: {ex.get('description', '')}\n"
+            f"Label: {ex['label']}"
+            for ex in labeled_examples
+        )
+        examples_section = f"Here are some labeled examples:\n\n{example_blocks}"
+    else:
+        examples_section = "No labeled examples are available."
+
+    output_format = (
+        "Respond using exactly this format, each on its own line:\n"
+        "Label: <one of interview, solo, panel, narrative>\n"
+        "Reasoning: <one or two sentences>"
+    )
+
+    new_episode = (
+        "Classify the episode below. Return your answer in the format below.\n\n"
+        f"Description: {description}\n"
+        "Label: ?"
+    )
+
+    return (
+        f"{instructions}\n\n"
+        f"{examples_section}\n\n"
+        f"{output_format}\n\n"
+        f"{new_episode}"
+    )
 
 
 def classify_episode(description: str, labeled_examples: list[dict]) -> dict:
@@ -76,7 +117,30 @@ def classify_episode(description: str, labeled_examples: list[dict]) -> dict:
 
     Before writing code, complete specs/classifier-spec.md.
     """
-    return {
-        "label": None,
-        "reasoning": "Classifier not yet implemented. Complete Milestone 2.",
-    }
+    try:
+        prompt = build_few_shot_prompt(labeled_examples, description)
+
+        response = _client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=250,
+        )
+
+        text = response.choices[0].message.content or ""
+
+        # Parse the "Label: X" / "Reasoning: Y" format line by line.
+        label = "unknown"
+        reasoning = text.strip()
+        for line in text.splitlines():
+            line = line.strip()
+            if line.lower().startswith("label:"):
+                raw = line.split(":", 1)[1].strip().lower().strip(".,!?\"'")
+                if raw in VALID_LABELS:
+                    label = raw
+            elif line.lower().startswith("reasoning:"):
+                reasoning = line.split(":", 1)[1].strip()
+
+        return {"label": label, "reasoning": reasoning}
+
+    except Exception as e:
+        return {"label": "unknown", "reasoning": f"Error: {e}"}

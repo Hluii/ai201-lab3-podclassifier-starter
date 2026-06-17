@@ -162,6 +162,9 @@ Extract the response text from:
 [blank — how do you extract the label and reasoning from the LLM's text output?
 What string operations or parsing logic do you need?
 This depends on the output format you chose in build_few_shot_prompt.]
+
+normalize capitolization, split, remove punctuations
+
 ```
 
 ---
@@ -172,17 +175,17 @@ This depends on the output format you chose in build_few_shot_prompt.]
 [blank — what do you do if the LLM returns a label that isn't in VALID_LABELS?
 What should label be set to?]
 ```
-
+"Unknown"
 ---
 
 **Step 5 — Handle errors gracefully:**
 
 ```
 [blank — what could go wrong? (Network error? Unparseable response?)
-What should the function return if something fails?
+What should the functionx return if something fails?
 Hint: the evaluation loop runs 20 calls — one bad response shouldn't crash everything.]
 ```
-
+set label as unknown and reasoning as the error message, but not raise exception
 ---
 
 ### Return value structure
